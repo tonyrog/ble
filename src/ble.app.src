@@ -1,0 +1,9 @@
+{application, ble,
+ [{description, "ble"},
+  {vsn, git},
+  {modules, ["@@MODULES@@"]},
+%%  {mod, {ble_app, []}},
+%%  {registered, [ble_srv]},
+  {env, []},
+  {applications,[kernel,stdlib,bt]}
+  ]}.
