@@ -145,19 +145,18 @@ discover(Central, Device) ->
 	{ok, ConnRef} ->
 	    case discover_services(Central, ConnRef) of
 		{ok, Services} ->
-		    lists:foreach(
-		      fun(Service) ->
-			      save(Device, Service)
-		      end, Services),
+		    %% fixme: make sure to pickup scan info!?
+		    save(Device),
 		    List = 
 			[ 
-			   case discover_characteristics(Central,ConnRef,Service) of 
-			       {ok,Chars} ->
-				   save(Device, Service, Chars),
-				   Service#{characteristics=>Chars};
+			  case discover_characteristics(Central,ConnRef,Service) of 
+			      {ok,Chars} ->
+				  save(Device, Service, Chars),
+				  Service#{characteristics=>Chars};
 			       {error,_} ->
-				   Service
-			   end || Service <- Services],
+				  save(Device, Service),
+				  Service
+			  end || Service <- Services],
 		    disconnect(Central, ConnRef),
 		    {ok, List};
 		Error ->
@@ -168,12 +167,34 @@ discover(Central, Device) ->
 	    Error
     end.
 
+%% Save
+%% cache/(public|private)/<bt-addr>/devinfo
+%%
+-spec save(Device::device()) ->
+	  ok | {error, Reason::term()}.
+save(Device) ->
+    {AddrType, Addr} = get_type_and_addr(Device),
+    StrAddr = lists:flatten(bt_util:format_address(Addr)),
+    CacheDir = filename:join(code:priv_dir(?MODULE), "cache"),
+    DevDir   = filename:join([CacheDir, AddrType, StrAddr]),
+    ok = filelib:ensure_path(DevDir),
+    DevInfoFilename = filename:join(DevDir, "devinfo"),
+    DevData = io_lib:format("~p.\n", [Device]),
+    R = file:write_file(DevInfoFilename, [DevData]),
+    ?debug("Write file ~s [~w]\n", [DevInfoFilename, R]),
+    R.
+
+%%
+%% Write Services and Characteristics to disk
+%% cache/(public|private)/<bt-addr>/
+%%     Service1 ... ServiceN (given with Full UUID string)
+%%
 -spec save(Device::device(), Service::service()) ->
 	  ok | {error, Reason::term()}.
 save(Device, Service) ->
     {AddrType, Addr} = get_type_and_addr(Device),
     StrAddr = lists:flatten(bt_util:format_address(Addr)),
-    CacheDir = filename:join(code:priv_dir(bt), "cache"),
+    CacheDir = filename:join(code:priv_dir(?MODULE), "cache"),
     DevDir   = filename:join([CacheDir, AddrType, StrAddr]),
     ok = filelib:ensure_path(DevDir),
     ServiceUUID = bt_util:uuid_to_string(maps:get(uuid, Service)),
@@ -184,10 +205,11 @@ save(Device, Service) ->
     ?debug("Write file ~s [~w]\n", [ServiceFilename, R]),
     R.
 
+%% Fixme write Service as directory? anc Chars as files?
 save(Device, Service, Chars) ->
     {AddrType, Addr} = get_type_and_addr(Device),
     StrAddr = lists:flatten(bt_util:format_address(Addr)),
-    CacheDir = filename:join(code:priv_dir(bt), "cache"),
+    CacheDir = filename:join(code:priv_dir(?MODULE), "cache"),
     DevDir   = filename:join([CacheDir, AddrType, StrAddr]),
     ok = filelib:ensure_path(DevDir),
     ?debug("Ensured path ~s\n", [DevDir]),
