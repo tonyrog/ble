@@ -106,13 +106,11 @@
 		     addr_type => public | random | 1 | 0 }.
 -type timeout_ms() :: integer().
 
-
 -define(DEFAULT_CONNECT_TIMEOUT, 5000).
 -define(HCI_TIMEOUT, 2000).
 -define(HCI_NOEVENT, -1).
 
--define(DEFAULT_INTERFACE, "hci1"). %% usb dongle
--define(DEFAULT_CHANNEL, user).     %% working ble mode!
+-define(DEFAULT_CHANNEL, user).
 
 -type ble_options() :: 
 	#{
@@ -129,10 +127,6 @@
 	   type => connectable | scannable | not_connectable | directed,
 	   own_addr_type => public | random
 	 }.
-
-	   
-	   
-
 
 %%
 %% Discover service via address or device from scan
@@ -952,8 +946,8 @@ print_device(#{addr := Addr} = Device) ->
     AddrStr = bt_util:format_address(Addr),
     Name = maps:get(name, Device, "Unknown"),
     RSSI = maps:get(rssi, Device, 0),
-    io:format("~p\n", [Device]),
-    %% io:format("Device: ~s (~s) RSSI: ~w dBm\n", [Name, AddrStr, RSSI]),
+    %% io:format("~p\n", [Device]),
+    io:format("Device: ~s (~s) RSSI: ~w dBm\n", [Name, AddrStr, RSSI]),
     ok.
 
 %%====================================================================

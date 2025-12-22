@@ -89,9 +89,9 @@ discover_device(Central, Device) ->
 	    end
     end.
 
--define(MAX_SPEED, 40).
--define(MIN_SPEED, 10).
--define(STEP_SPEED, 5).
+-define(MAX_SPEED, 30).
+-define(MIN_SPEED, 12).
+-define(STEP_SPEED, 2).
     
 setup(Central, Device, ConnRef, _Services, Char) ->
     %% Subscribe to notifications instead of polling
@@ -108,8 +108,10 @@ setup(Central, Device, ConnRef, _Services, Char) ->
             io:format("Subscribed to notifications~n"),
 	    Value = <<?CCCD_NOTIFY:16/little>>,
 	    ble:write_handle(Central, ConnRef, ValueHandle+1, Value),
+	    {ok,U} = serial_pin:start(),
+	    write_power(Central, ConnRef, ValueHandle, ?MAX_SPEED),
 	    Result = wait_loop(Central, Device, ConnRef, Char, 
-			       ValueHandle, ?MIN_SPEED, ?STEP_SPEED),
+			       ValueHandle, U, go),
 	    io:format("DEBUG: wait_loop returned: ~p~n", [Result]),
 	    Result;
         {error, Reason} ->
@@ -117,9 +119,9 @@ setup(Central, Device, ConnRef, _Services, Char) ->
             {error, Reason}
     end.
 
-wait_loop(Central, Device, ConnRef, Char, ValueHandle, Power, Step) ->
+wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, St) ->
     %% Just wait - notifications will be handled by callback
-    io:format("DEBUG: wait_loop entering receive~n"),
+    io:format("DEBUG: wait_loop entering receive\n"),
     receive
 	setup ->
 	    #{ value_handle := ValueHandle} = Char,
@@ -129,37 +131,49 @@ wait_loop(Central, Device, ConnRef, Char, ValueHandle, Power, Step) ->
 	    %% ble:write_handle(Central, ConnRef, ValueHandle, LeftCmd),
 	    %% RightCmd = lego_messages:encode_enable_port_notifications(1),
 	    %% ble:write_handle(Central, ConnRef, ValueHandle, RightCmd),
-	    wait_loop(Central, Device, ConnRef, Char, ValueHandle, Power, Step);
+	    wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, St);
 
         {disconnected, Reason} ->
             io:format("DEBUG: Got {disconnected, ~p}~n", [Reason]),
 	    #{ uuid := CharUUID } = Char,
+	    serial_pin:stop(U),
             reconnect(Central, Device, ConnRef, CharUUID);
+
+	{uart, U, [B]} ->
+	    case serial_pin:handle_input(U, B) of
+		pulse ->
+		    io:format("PULSE\n"),
+		    timer:sleep(1000), %% wait for train to stop at correct loc
+		    write_power(Central, ConnRef, ValueHandle, 0),
+		    serial_pin:handle_action(U, trigger),
+		    wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, robot);
+		busy ->
+		    io:format("BUSY\n"),
+		    wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, busy);
+		run when St =/= run ->
+		    io:format("RUN\n"),
+		    write_power(Central, ConnRef, ValueHandle, ?MAX_SPEED),
+		    wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, run);
+		_ ->
+		    wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, St)
+	    end;
 
         Other ->
             io:format("DEBUG: wait_loop got unexpected message: ~p~n", [Other]),
-            wait_loop(Central, Device, ConnRef, Char, ValueHandle, Power, Step)
-    after 1000 ->
-	    PortID = 0,
-	    StartupInfo = 0,  % Buffer if necessary
-	    SubCommand = 16#51,  % WriteDirectModeData
-	    Mode = 0,  % Power mode
-	    Payload = <<PortID:8, StartupInfo:8, SubCommand:8, Mode:8, Power:8>>,
-	    %% Port Output Command
-	    Msg = #{ type => 16#81, hub_id => 0, payload => Payload },
-	    Cmd = lego_messages:encode_message(Msg),
-	    ble:write_handle(Central, ConnRef, ValueHandle, Cmd),
-	    if Power >= ?MAX_SPEED, Step > 0 ->
-		    wait_loop(Central, Device, ConnRef, Char, 
-			      ValueHandle, Power, -Step);
-	       Power =< ?MIN_SPEED, Step < 0 ->
-		    wait_loop(Central, Device, ConnRef, Char, 
-			      ValueHandle, Power, -Step);
-	       true ->
-		    wait_loop(Central, Device, ConnRef, Char, 
-			      ValueHandle, Power+Step, Step)
-	    end
+            wait_loop(Central, Device, ConnRef, Char, ValueHandle, U, St)
     end.
+
+write_power(Central, ConnRef, ValueHandle, Power) ->
+    PortID = 0,
+    StartupInfo = 0,  % Buffer if necessary
+    SubCommand = 16#51,  % WriteDirectModeData
+    Mode = 0,  % Power mode
+    Payload = <<PortID:8, StartupInfo:8, SubCommand:8, Mode:8, Power:8>>,
+    %% Port Output Command
+    Msg = #{ type => 16#81, hub_id => 0, payload => Payload },
+    Cmd = lego_messages:encode_message(Msg),
+    ble:write_handle(Central, ConnRef, ValueHandle, Cmd).
+
 
 reconnect(Central, Device, _ConnRef, CharUUID) ->
     case discover_device(Central, Device) of
