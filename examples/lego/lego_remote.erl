@@ -90,8 +90,8 @@ discover_device(Central, Device) ->
     end.
 
 -define(MAX_SPEED, 40).
--define(MIN_SPEED, 5).
--define(STEP_SPEED, 3).
+-define(MIN_SPEED, 10).
+-define(STEP_SPEED, 5).
     
 setup(Central, Device, ConnRef, _Services, Char) ->
     %% Subscribe to notifications instead of polling
