@@ -92,6 +92,12 @@ void loop()
 	case READ:
 	    Serial.write(input);
 	    break;
+	case TIMER:
+	    while (!Serial.available());
+	    if (timer == 0)
+	       last_tick = millis();
+	    timer = Serial.read();
+	    break;
 	case EVENT:
 	    while (!Serial.available());
 	    emask = Serial.read();
