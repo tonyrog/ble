@@ -365,7 +365,9 @@ format_service(Service = #{ uuid := UUID }, Prefix) ->
 		       {ok, Object} ->
 			   proplists:get_value(<<"name">>, Object);
 		       {error,enoent} ->
-			   "Unknown"
+			   "Unknown";
+		       {error,eninval} ->
+			   "Invalid"
 		   end,
 	    [io_lib:format("~sSERV ~4.16.0B\n", [Prefix, UUID16]),
 	     io_lib:format("~s~s\n",[Prefix,Name])]

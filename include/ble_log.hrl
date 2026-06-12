@@ -11,9 +11,9 @@
 -define(LOG_LEVEL_INFO,      6).
 -define(LOG_LEVEL_DEBUG,     7).
 
-%%-define(BLE_LOG_LEVEL, ?LOG_LEVEL_DEBUG).
+-define(BLE_LOG_LEVEL, ?LOG_LEVEL_DEBUG).
 %%-define(BLE_LOG_LEVEL, ?LOG_LEVEL_ERROR).
--define(BLE_LOG_LEVEL, ?LOG_LEVEL_INFO).
+%%-define(BLE_LOG_LEVEL, ?LOG_LEVEL_INFO).
 
 -define(debug(Fmt),   ?ble_log(?LOG_LEVEL_DEBUG,"DEBUG: " Fmt ,[])).
 -define(warning(Fmt), ?ble_log(?LOG_LEVEL_WARNING,"WARNING: " Fmt,[])).
